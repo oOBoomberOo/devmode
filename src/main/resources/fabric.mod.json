@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "devmode",
+  "version": "${version}",
+  "name": "Developer Mode",
+  "description": "",
+  "authors": [
+    "Boomber"
+  ],
+  "contact": {
+    "repo": "https://github.com/oOBoomberOo/devmode"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/devmode/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "me.boomber.devmode.DeveloperMode"
+    ]
+  },
+  "mixins": [
+    "devmode.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
