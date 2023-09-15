@@ -70,17 +70,17 @@ public record ParsingFailure(ResourceLocation id, Component source, String reaso
         }
 
         private final IllegalArgumentException exception;
-        private final Pattern pattern = Pattern.compile("Whilst parsing command on line (\\d+): (.+) at position (\\d+).*", Pattern.CASE_INSENSITIVE);
+        private final Pattern pattern = Pattern.compile("Whilst parsing command on line (?<row>\\d+): (?<reason>.+(?=at position (?<column>\\d+).+).*|.+)", Pattern.CASE_INSENSITIVE);
 
         public ExceptionParsingResult parse() {
             var matcher = pattern.matcher(exception.getMessage());
 
             if (matcher.find()) {
-                var lineNumber = Integer.parseInt(matcher.group(1));
-                var reason = matcher.group(2);
-                var position = Integer.parseInt(matcher.group(3));
+                var lineNumber = Integer.parseInt(matcher.group("row"));
+                var reason = matcher.group("reason");
+                var position = matcher.group("column");
 
-                return new ExceptionParsingResult(reason, lineNumber, position);
+                return new ExceptionParsingResult(reason, lineNumber, position == null ? 0 : Integer.parseInt(position));
             }
 
             return new ExceptionParsingResult("", -1, 0);
