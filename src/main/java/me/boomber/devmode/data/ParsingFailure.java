@@ -47,8 +47,12 @@ public record ParsingFailure(ResourceLocation id, Component source, String reaso
             var prefix = String.format("%3d| ", i + 1);
 
             if (i == row) {
-                var before = text(prefix + content.substring(0, col), ChatFormatting.WHITE);
-                var after = text(content.substring(col), ChatFormatting.RED);
+                var successPart = content.substring(0, col);
+                var errorPart = content.substring(col);
+                var isNotVisible = errorPart.isBlank();
+
+                var before = text(prefix + successPart, ChatFormatting.WHITE);
+                var after = text(isNotVisible ? "_" : errorPart, ChatFormatting.RED);
                 result.add(join(before, after, text("\n")));
             } else {
                 result.add(join(text(prefix + content, ChatFormatting.GRAY), text("\n")));
