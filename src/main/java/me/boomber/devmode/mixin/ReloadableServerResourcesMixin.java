@@ -1,6 +1,6 @@
 package me.boomber.devmode.mixin;
 
-import me.boomber.devmode.DevServerFunctionLibrary;
+import me.boomber.devmode.server.DevServerFunctionLibrary;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.ReloadableServerResources;

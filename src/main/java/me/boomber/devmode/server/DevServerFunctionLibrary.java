@@ -1,22 +1,18 @@
-package me.boomber.devmode;
+package me.boomber.devmode.server;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.logging.LogUtils;
-import me.boomber.devmode.data.ParsingError;
-import me.boomber.devmode.data.ParsingFailure;
+import me.boomber.devmode.data.FunctionParsingException;
+import me.boomber.devmode.mixin.ReloadableServerResourcesMixin;
 import me.boomber.devmode.mixin.ServerFunctionLibraryMixin;
-import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandFunction;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.ReloadableServerResources;
 import net.minecraft.server.ServerFunctionLibrary;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -31,6 +27,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
+/**
+ * A replacement for {@link ServerFunctionLibrary} that catch parsing errors and report it back to the chat.
+ * It overrides {@link #reload} method so that it can report errors whenever the server is /reload.
+ *
+ * @apiNote
+ * This class is injected into the constructor of {@link ReloadableServerResources} via {@link ReloadableServerResourcesMixin}
+ */
 public class DevServerFunctionLibrary extends ServerFunctionLibrary {
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -38,13 +41,7 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
         super(level, commandDispatcher);
     }
 
-    public void broadcastErrors(List<ParsingError> errors) {
-        for (ParsingError error : errors) {
-            var content = error.parsingFailure.formatMessage();
-            ServerBroadcaster.send(content);
-        }
-    }
-
+    // Magic function, mostly copied from super but with the error collection logic
     @Override
     public @NotNull CompletableFuture<Void> reload(PreparationBarrier preparationBarrier,
                                                    ResourceManager resourceManager,
@@ -67,7 +64,7 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
                     null);
 
             @SuppressWarnings("unchecked")
-            CompletableFuture<ParseFunction>[] tasks = resourceMap.entrySet().stream().map((entry) -> {
+            CompletableFuture<ParsedFunction>[] tasks = resourceMap.entrySet().stream().map((entry) -> {
                 var location = entry.getKey();
                 var resource = entry.getValue();
                 return parseFunction(location, resource, executor, internal.getDispatcher(), commandSourceStack);
@@ -80,15 +77,15 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
             var tags = pair.getFirst();
             var functions = pair.getSecond();
             ImmutableMap.Builder<ResourceLocation, CommandFunction> builder = ImmutableMap.builder();
-            var errors = new java.util.ArrayList<ParsingError>();
+            var errors = new java.util.ArrayList<FunctionParsingException>();
 
             for (var function : functions) {
-                function.handle((parseFunction, throwable) -> {
+                function.handle((parsedFunction, throwable) -> {
 
                     if (throwable instanceof CompletionException exception) {
                         handleError(exception, errors);
                     } else {
-                        builder.put(parseFunction.resourceLocation, parseFunction.function);
+                        builder.put(parsedFunction.resourceLocation, parsedFunction.function);
                     }
 
                     return null;
@@ -102,29 +99,36 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
         }, executor2);
     }
 
-    private void handleError(CompletionException exception, List<ParsingError> errors) {
-        if (exception.getCause() instanceof ParsingError parsingError) {
-            var location = parsingError.resourceLocation;
+    private void broadcastErrors(List<FunctionParsingException> errors) {
+        for (var error : errors) {
+            var content = error.formatMessage();
+            DevModeFeedback.INSTANCE.sendMessage(content);
+        }
+    }
+
+    private void handleError(CompletionException exception, List<FunctionParsingException> errors) {
+        if (exception.getCause() instanceof FunctionParsingException parsingError) {
+            var location = parsingError.getId();
             errors.add(parsingError);
-            LOGGER.error("Failed to load function {}", location, exception);
+            LOGGER.error("Failed to load function {}\n{}", location, parsingError.formatMessage().getString());
         } else {
             LOGGER.error("Failed to load function", exception);
         }
     }
 
-    private CompletableFuture<ParseFunction> parseFunction(ResourceLocation location, Resource resource, Executor executor, CommandDispatcher<CommandSourceStack> dispatcher, CommandSourceStack commandSourceStack) {
+    private CompletableFuture<ParsedFunction> parseFunction(ResourceLocation location, Resource resource, Executor executor, CommandDispatcher<CommandSourceStack> dispatcher, CommandSourceStack commandSourceStack) {
         return CompletableFuture.supplyAsync(() -> {
             List<String> sourceCode = ServerFunctionLibraryMixin.readLines(resource);
 
             try {
                 var id = ServerFunctionLibraryMixin.getLister().fileToId(location);
                 var result = CommandFunction.fromLines(id, dispatcher, commandSourceStack, sourceCode);
-                return new ParseFunction(result, id);
+                return new ParsedFunction(result, id);
             } catch (IllegalArgumentException error) {
-                throw new ParsingError(error, ParsingFailure.from(location, error, sourceCode), location);
+                throw FunctionParsingException.from(location, error, sourceCode);
             }
         }, executor);
     }
 
-    private record ParseFunction(CommandFunction function, ResourceLocation resourceLocation) {}
+    private record ParsedFunction(CommandFunction function, ResourceLocation resourceLocation) {}
 }

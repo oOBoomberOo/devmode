@@ -18,19 +18,19 @@ import java.util.Map;
 
 @Mixin(ServerFunctionLibrary.class)
 public interface ServerFunctionLibraryMixin {
-    @Accessor("tagsLoader")
+    @Accessor
     TagLoader<CommandFunction> getTagsLoader();
 
-    @Accessor("dispatcher")
+    @Accessor
     CommandDispatcher<CommandSourceStack> getDispatcher();
 
-    @Accessor("functionCompilationLevel")
+    @Accessor
     int getFunctionCompilationLevel();
 
-    @Accessor("functions")
+    @Accessor
     void setFunctions(Map<ResourceLocation, CommandFunction> functions);
 
-    @Accessor("tags")
+    @Accessor
     void setTags(Map<ResourceLocation, Collection<CommandFunction>> tags);
 
     @Accessor("LISTER")
