@@ -41,7 +41,7 @@ public class FunctionExceptionParser {
             var position = match.column();
 
             var contentRange = sourceCode.line(lineNumber - contextSize, lineNumber + contextSize);
-            var highlightRange = sourceCode.line(lineNumber).add(position, 0);
+            var highlightRange = sourceCode.line(lineNumber).add(position + 1, 0);
 
             return new FunctionParseResult(resourceLocation, sourceCode, reason, contentRange, highlightRange);
         }
