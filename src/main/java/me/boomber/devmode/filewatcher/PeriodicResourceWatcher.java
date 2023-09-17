@@ -53,14 +53,18 @@ public class PeriodicResourceWatcher implements ResourceWatcher {
 
         @Override
         public void run() {
-            @Nullable var key = watchService.poll();
+            var events = new ArrayList<ResourceEvent>();
 
-            if (key == null) {
-                return;
+            while (true) {
+                @Nullable var key = watchService.poll();
+
+                if (key == null) break;
+
+                events.addAll(getEvents(key));
+                key.reset();
             }
 
-            var events = getEvents(key);
-            key.reset();
+            if (events.isEmpty()) return;
 
             notifyObservers(events);
         }
