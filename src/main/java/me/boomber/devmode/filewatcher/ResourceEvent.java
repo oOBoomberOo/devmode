@@ -13,16 +13,31 @@ final class ModifyEvent extends ResourceEvent {
     ModifyEvent(Path path) {
         super(path);
     }
+
+    @Override
+    public String toString() {
+        return "Modify[%s]".formatted(path);
+    }
 }
 
 final class CreateEvent extends ResourceEvent {
     CreateEvent(Path path) {
         super(path);
     }
+
+    @Override
+    public String toString() {
+        return "Create[%s]".formatted(path);
+    }
 }
 
 final class DeleteEvent extends ResourceEvent {
     DeleteEvent(Path path) {
         super(path);
+    }
+
+    @Override
+    public String toString() {
+        return "Delete[%s]".formatted(path);
     }
 }
