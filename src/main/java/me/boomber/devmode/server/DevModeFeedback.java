@@ -1,6 +1,6 @@
 package me.boomber.devmode.server;
 
-import me.boomber.devmode.text.Text;
+import me.boomber.devmode.utils.Text;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;

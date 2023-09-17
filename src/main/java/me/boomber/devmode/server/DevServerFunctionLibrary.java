@@ -4,13 +4,14 @@ import com.google.common.collect.ImmutableMap;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.logging.LogUtils;
-import me.boomber.devmode.data.FunctionParsingException;
+import me.boomber.devmode.data.FunctionParseException;
 import me.boomber.devmode.mixin.ReloadableServerResourcesMixin;
 import me.boomber.devmode.mixin.ServerFunctionLibraryMixin;
 import net.minecraft.commands.CommandFunction;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.ReloadableServerResources;
 import net.minecraft.server.ServerFunctionLibrary;
@@ -36,6 +37,7 @@ import java.util.concurrent.Executor;
  */
 public class DevServerFunctionLibrary extends ServerFunctionLibrary {
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final FileToIdConverter LISTER = new FileToIdConverter("functions", ".mcfunction");
 
     public DevServerFunctionLibrary(int level, CommandDispatcher<CommandSourceStack> commandDispatcher) {
         super(level, commandDispatcher);
@@ -52,7 +54,7 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
         var internal = (ServerFunctionLibraryMixin) this;
 
         var f1 = CompletableFuture.supplyAsync(() -> internal.getTagsLoader().load(resourceManager), executor);
-        var f2 = CompletableFuture.supplyAsync(() -> ServerFunctionLibraryMixin.getLister().listMatchingResources(resourceManager), executor).thenCompose((resourceMap) -> {
+        var f2 = CompletableFuture.supplyAsync(() -> LISTER.listMatchingResources(resourceManager), executor).thenCompose((resourceMap) -> {
             var commandSourceStack = new CommandSourceStack(CommandSource.NULL,
                     Vec3.ZERO,
                     Vec2.ZERO,
@@ -77,7 +79,7 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
             var tags = pair.getFirst();
             var functions = pair.getSecond();
             ImmutableMap.Builder<ResourceLocation, CommandFunction> builder = ImmutableMap.builder();
-            var errors = new java.util.ArrayList<FunctionParsingException>();
+            var errors = new java.util.ArrayList<FunctionParseException>();
 
             for (var function : functions) {
                 function.handle((parsedFunction, throwable) -> {
@@ -99,18 +101,18 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
         }, executor2);
     }
 
-    private void broadcastErrors(List<FunctionParsingException> errors) {
+    private void broadcastErrors(List<FunctionParseException> errors) {
         for (var error : errors) {
-            var content = error.formatMessage();
+            var content = error.format();
             DevModeFeedback.INSTANCE.sendMessage(content);
         }
     }
 
-    private void handleError(CompletionException exception, List<FunctionParsingException> errors) {
-        if (exception.getCause() instanceof FunctionParsingException parsingError) {
-            var location = parsingError.getId();
+    private void handleError(CompletionException exception, List<FunctionParseException> errors) {
+        if (exception.getCause() instanceof FunctionParseException parsingError) {
+            var location = parsingError.location();
             errors.add(parsingError);
-            LOGGER.error("Failed to load function {}\n{}", location, parsingError.formatMessage().getString());
+            LOGGER.error("Failed to load function {}\n{}", location, parsingError.format().getString());
         } else {
             LOGGER.error("Failed to load function", exception);
         }
@@ -121,11 +123,11 @@ public class DevServerFunctionLibrary extends ServerFunctionLibrary {
             List<String> sourceCode = ServerFunctionLibraryMixin.readLines(resource);
 
             try {
-                var id = ServerFunctionLibraryMixin.getLister().fileToId(location);
+                var id = LISTER.fileToId(location);
                 var result = CommandFunction.fromLines(id, dispatcher, commandSourceStack, sourceCode);
                 return new ParsedFunction(result, id);
             } catch (IllegalArgumentException error) {
-                throw FunctionParsingException.from(location, error, sourceCode);
+                throw FunctionParseException.from(location, error, sourceCode);
             }
         }, executor);
     }

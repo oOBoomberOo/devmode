@@ -1,4 +1,4 @@
-package me.boomber.devmode.text;
+package me.boomber.devmode.utils;
 
 import lombok.experimental.UtilityClass;
 import net.minecraft.ChatFormatting;

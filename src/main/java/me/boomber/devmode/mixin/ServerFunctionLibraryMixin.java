@@ -3,7 +3,6 @@ package me.boomber.devmode.mixin;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandFunction;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.ServerFunctionLibrary;
 import net.minecraft.server.packs.resources.Resource;
@@ -32,11 +31,6 @@ public interface ServerFunctionLibraryMixin {
 
     @Accessor
     void setTags(Map<ResourceLocation, Collection<CommandFunction>> tags);
-
-    @Accessor("LISTER")
-    static FileToIdConverter getLister() {
-        throw new AssertionError();
-    }
 
     @Invoker("readLines")
     static List<String> readLines(Resource resource) {

@@ -1,9 +1,12 @@
 package me.boomber.devmode.data;
 
 import lombok.Data;
+import me.boomber.devmode.data.pattern.FunctionParsePattern;
 import net.minecraft.commands.CommandFunction;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.regex.Pattern;
+import java.util.List;
 
 /**
  * Due to a quirk in {@link CommandFunction#fromLines} api, any parsing exceptions bubbling up from that function is converted into {@link IllegalArgumentException} first.
@@ -12,20 +15,37 @@ import java.util.regex.Pattern;
  */
 @Data
 public class FunctionExceptionParser {
+    @NotNull
     private final IllegalArgumentException exception;
-    private Pattern pattern = Pattern.compile("Whilst parsing command on line (?<row>\\d+): (?<reason>.+(?=at position (?<column>\\d+).+).*|.+)", Pattern.CASE_INSENSITIVE);
+    @NotNull
+    private final SourceCode sourceCode;
+    @NotNull
+    private final ResourceLocation resourceLocation;
 
-    public FunctionException parse() {
-        var matcher = pattern.matcher(exception.getMessage());
+    private FunctionParsePattern parseWithPosition = new FunctionParsePattern("Whilst parsing command on line (?<row>\\d+): (?<reason>.+ at position (?<column>\\d+).+)");
+    private FunctionParsePattern parseWithoutPosition = new FunctionParsePattern("Whilst parsing command on line (?<row>\\d+): (?<reason>.+)");
+    private FunctionParsePattern unknownCommand = new FunctionParsePattern("(?<reason>Unknown or invalid command .+ on line (?<row>\\d+) .+)");
 
-        if (matcher.find()) {
-            var lineNumber = Integer.parseInt(matcher.group("row"));
-            var reason = matcher.group("reason");
-            var position = matcher.group("column");
+    private List<FunctionParsePattern> patterns = List.of(parseWithPosition, parseWithoutPosition, unknownCommand);
 
-            return new FunctionException(reason, lineNumber, position == null ? 0 : Integer.parseInt(position));
+    private int contextSize = 2;
+
+    public FunctionParseResult parse() {
+        for (var pattern : patterns) {
+            var match = pattern.match(exception.getMessage());
+
+            if (match == null) continue;
+
+            var lineNumber = match.row() - 1;
+            var reason = match.reason();
+            var position = match.column();
+
+            var contentRange = sourceCode.line(lineNumber - contextSize, lineNumber + contextSize);
+            var highlightRange = sourceCode.line(lineNumber).add(position, 0);
+
+            return new FunctionParseResult(resourceLocation, sourceCode, reason, contentRange, highlightRange);
         }
 
-        return new FunctionException("", -1, 0);
+        return new FunctionParseResult(resourceLocation, sourceCode, exception.getMessage(), sourceCode.range(), sourceCode.range());
     }
 }
